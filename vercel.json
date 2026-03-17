@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/Holbrook_AZ_Climate_Dashboard.html" }
+  ]
+}
