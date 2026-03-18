@@ -84,7 +84,7 @@ def main():
                 f"Avg Min Temp: {a['min_temp']}°F<br>"
                 f"Avg Precip: {a['precip']} in")
 
-    # For each metric, build: scatter points, mean line, +2σ line, -2σ line
+    # For each metric, build: scatter points, mean line, ±1σ lines, ±2σ lines
     chart_data = {}
     for m in METRICS:
         scatter_x = []
@@ -92,6 +92,10 @@ def main():
         scatter_text = []
         mean_y = []
         mean_text = []
+        plus1_y = []
+        plus1_text = []
+        minus1_y = []
+        minus1_text = []
         plus2_y = []
         plus2_text = []
         minus2_y = []
@@ -108,6 +112,10 @@ def main():
             day_labels.append(dd)
             avg_r = round(avg, 2) if avg is not None else "N/A"
             mean_y.append(avg_r if avg is not None else None)
+            plus1_val = round(avg + 1 * std, 2) if avg is not None else "N/A"
+            plus1_y.append(plus1_val if avg is not None else None)
+            minus1_val = round(avg - 1 * std, 2) if avg is not None else "N/A"
+            minus1_y.append(minus1_val if avg is not None else None)
             plus2_val = round(avg + 2 * std, 2) if avg is not None else "N/A"
             plus2_y.append(plus2_val if avg is not None else None)
             minus2_val = round(avg - 2 * std, 2) if avg is not None else "N/A"
@@ -116,10 +124,14 @@ def main():
             line_hover = (
                 f"<b>{pretty}</b><br>"
                 f"Mean: {avg_r} {m['unit']}<br>"
+                f"+1σ: {plus1_val} {m['unit']}<br>"
+                f"−1σ: {minus1_val} {m['unit']}<br>"
                 f"+2σ: {plus2_val} {m['unit']}<br>"
                 f"−2σ: {minus2_val} {m['unit']}"
             )
             mean_text.append(line_hover)
+            plus1_text.append(line_hover)
+            minus1_text.append(line_hover)
             plus2_text.append(line_hover)
             minus2_text.append(line_hover)
 
@@ -138,6 +150,10 @@ def main():
             "scatter_text": scatter_text,
             "mean_y": mean_y,
             "mean_text": mean_text,
+            "plus1_y": plus1_y,
+            "plus1_text": plus1_text,
+            "minus1_y": minus1_y,
+            "minus1_text": minus1_text,
             "plus2_y": plus2_y,
             "plus2_text": plus2_text,
             "minus2_y": minus2_y,
@@ -166,6 +182,7 @@ def generate_html(chart_data, month_ticks, month_labels):
     for m in METRICS:
         cd = chart_data[m["key"]]
         is_precip = m["key"] == "precip"
+        has_1sigma = m["key"] in ("precip", "avg_temp")
         traces = f"""
         {{
             x: {json.dumps(cd['scatter_x'])},
@@ -194,6 +211,28 @@ def generate_html(chart_data, month_ticks, month_labels):
             line: {{ color: '#e67e22', width: 2, dash: 'solid' }},
             hoverinfo: 'text',
             name: '+2 Std Dev'
+        }}"""
+        if has_1sigma:
+            traces += f""",
+        {{
+            x: {json.dumps(list(range(len(cd['plus1_y']))))},
+            y: {json.dumps(cd['plus1_y'])},
+            text: {json.dumps(cd['plus1_text'])},
+            mode: 'lines',
+            line: {{ color: '{"#2980b9" if is_precip else "#16a085"}', width: 2, dash: 'solid' }},
+            hoverinfo: 'text',
+            name: '+1 Std Dev'
+        }}"""
+        if has_1sigma and not is_precip:
+            traces += f""",
+        {{
+            x: {json.dumps(list(range(len(cd['minus1_y']))))},
+            y: {json.dumps(cd['minus1_y'])},
+            text: {json.dumps(cd['minus1_text'])},
+            mode: 'lines',
+            line: {{ color: '#2980b9', width: 2, dash: 'solid' }},
+            hoverinfo: 'text',
+            name: '−1 Std Dev'
         }}"""
         if not is_precip:
             traces += f""",
@@ -263,6 +302,8 @@ def generate_html(chart_data, month_ticks, month_labels):
 </p>
 <div class="legend-info">
     <span><span class="swatch" style="background:#2c3e50;"></span> Mean</span>
+    <span><span class="swatch" style="background:#16a085; border-top: 2px dashed #16a085;"></span> +1 Std Dev</span>
+    <span><span class="swatch" style="background:#2980b9; border-top: 2px dashed #2980b9;"></span> −1 Std Dev</span>
     <span><span class="swatch" style="background:#e67e22;"></span> +2 Std Dev</span>
     <span><span class="swatch" style="background:#8e44ad;"></span> −2 Std Dev</span>
     <span style="color:#999;">|</span>
